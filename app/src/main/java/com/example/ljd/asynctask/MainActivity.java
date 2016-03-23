@@ -1,21 +1,16 @@
 package com.example.ljd.asynctask;
 
 import android.app.ProgressDialog;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
-import android.widget.ImageView;
 import android.widget.Toast;
 
 import java.io.BufferedInputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -24,17 +19,12 @@ import java.net.URL;
 
 public class MainActivity extends AppCompatActivity implements View.OnClickListener{
 
-    private ImageView mImageView1;
-    private ImageView mImageView2;
-    private ImageView mImageView3;
-    private ProgressDialog mProgressDialog;
     private DownloadAsyncTask mDownloadAsyncTask;
 
     private Button mButton;
     private String[] path = {
-            "http://d.hiphotos.baidu.com/zhidao/pic/item/7c1ed21b0ef41bd5e6c559a057da81cb38db3dcb.jpg",
-            "http://a.hiphotos.baidu.com/zhidao/pic/item/728da9773912b31bb82f07408418367adab4e11c.jpg",
-            "http://pic.6188.com/upload_6188s/flashAll/s800/20120907/1346981960xNARbD.jpg"
+            "http://msoftdl.360.cn/mobilesafe/shouji360/360safesis/360MobileSafe_6.2.3.1060.apk",
+            "http://dlsw.baidu.com/sw-search-sp/soft/7b/33461/freeime.1406862029.exe",
     };
 
     @Override
@@ -43,9 +33,6 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         setContentView(R.layout.activity_main);
         mButton = (Button)findViewById(R.id.button);
         mButton.setOnClickListener(this);
-        mImageView1 = (ImageView)findViewById(R.id.image1);
-        mImageView2 = (ImageView)findViewById(R.id.image2);
-        mImageView3 = (ImageView)findViewById(R.id.image3);
     }
 
     @Override
@@ -63,50 +50,51 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         mDownloadAsyncTask.execute(path);
     }
 
-    /**
-     * 获取下载到sd卡中下载的图片
-     * @param i
-     * @return
-     */
-    public Bitmap getLocalBitmap(int i) {
-        try {
-            File file = new File(Environment.getExternalStorageDirectory(), i+".jpg");
-            FileInputStream fis = new FileInputStream(file);
-            return BitmapFactory.decodeStream(fis);
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
+
 
     class DownloadAsyncTask extends AsyncTask<String,Integer,Boolean>{
 
+        private ProgressDialog mPBar;
+        private int fileSize;     //下载的文件大小
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
-            mProgressDialog = new ProgressDialog(MainActivity.this);
-            mProgressDialog.setTitle("下载");
-            mProgressDialog.setMessage("正在下载......");
-            mProgressDialog.setCancelable(false);
-            mProgressDialog.show();
+            mPBar = new ProgressDialog(MainActivity.this);
+            mPBar.setProgressNumberFormat("%1d KB/%2d KB");
+            mPBar.setTitle("下载");
+            mPBar.setMessage("正在下载，请稍后...");
+            mPBar.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+            mPBar.setCancelable(false);
+            mPBar.show();
         }
 
         @Override
         protected Boolean doInBackground(String... params) {
+            //下载图片
+
             for (int i=0;i<params.length;i++){
                 try{
                     if(Environment.getExternalStorageState().equals(Environment.MEDIA_MOUNTED)){
                         URL url = new URL(params[i]);
                         HttpURLConnection conn =  (HttpURLConnection) url.openConnection();
+                        //设置超时时间
                         conn.setConnectTimeout(5000);
+                        //获取下载文件的大小
+                        fileSize = conn.getContentLength();
                         InputStream is = conn.getInputStream();
-                        File file = new File(Environment.getExternalStorageDirectory(), i+".jpg");
+                        //获取文件名称
+                        String fileName = path[i].substring(path[i].lastIndexOf("/") + 1);
+                        File file = new File(Environment.getExternalStorageDirectory(), fileName);
                         FileOutputStream fos = new FileOutputStream(file);
                         BufferedInputStream bis = new BufferedInputStream(is);
                         byte[] buffer = new byte[1024];
                         int len ;
+                        int total = 0;
                         while((len =bis.read(buffer))!=-1){
                             fos.write(buffer, 0, len);
+                            total += len;
+                            publishProgress(total);
+                            fos.flush();
                         }
                         fos.close();
                         bis.close();
@@ -127,13 +115,19 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         @Override
         protected void onPostExecute(Boolean aBoolean) {
             super.onPostExecute(aBoolean);
-            mProgressDialog.dismiss();
-            mImageView1.setImageBitmap(getLocalBitmap(0));
-            mImageView2.setImageBitmap(getLocalBitmap(1));
-            mImageView3.setImageBitmap(getLocalBitmap(2));
+            mPBar.dismiss();
             if (aBoolean){
                 Toast.makeText(MainActivity.this,"下载完成",Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(MainActivity.this,"下载失败",Toast.LENGTH_SHORT).show();
             }
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+            mPBar.setMax(fileSize / 1024);
+            mPBar.setProgress(values[0]/1024);
         }
     }
 
